@@ -15,6 +15,34 @@ services:
       retries: 3
     restart: unless-stopped
 
+  eye-api:
+    build:
+      context: ./eye-disease-service
+      dockerfile: Dockerfile
+    container_name: avc-eye-api
+    ports:
+      - "8001:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  skin-api:
+    build:
+      context: ./skin-service
+      dockerfile: Dockerfile
+    container_name: avc-skin-api
+    ports:
+      - "8002:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
   frontend:
     build:
       context: ./frontend
@@ -24,7 +52,14 @@ services:
       - "8501:8501"
     environment:
       - AVC_SERVICE_URL=http://avc-api:8000
+      - EYE_SERVICE_URL=http://eye-api:8000
+      - SKIN_SERVICE_URL=http://skin-api:8000
     depends_on:
       avc-api:
         condition: service_healthy
+      eye-api:
+        condition: service_healthy
+      skin-api:
+        condition: service_healthy
     restart: unless-stopped
+

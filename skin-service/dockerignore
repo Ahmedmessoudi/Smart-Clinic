@@ -1,0 +1,15 @@
+__pycache__
+*.pyc
+*.pyo
+venv/
+.venv/
+*.egg-info/
+.git/
+.gitignore
+raw_data/
+outputs_v2/
+outputs_v3/
+visualizations/
+*.zip
+*.tar.gz
+README.md

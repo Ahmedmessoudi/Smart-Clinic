@@ -1,0 +1,14 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+python-multipart==0.0.12
+Pillow==11.0.0
+numpy==1.26.4
+# Modèle 1 (rétine) — keras 3.x standalone + TensorFlow backend
+# TF 2.16+ livre keras>=3 séparé ; on épingle les deux pour éviter les conflits.
+tensorflow==2.16.2
+keras==3.3.3
+# Modèle 2 (externe)
+torch==2.5.1
+torchvision==0.20.1
+
