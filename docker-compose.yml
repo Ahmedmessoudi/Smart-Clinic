@@ -1,0 +1,30 @@
+version: "3.8"
+
+services:
+  avc-api:
+    build:
+      context: ./avc-ml-service
+      dockerfile: Dockerfile
+    container_name: avc-ml-api
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 15s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: avc-frontend-ui
+    ports:
+      - "8501:8501"
+    environment:
+      - AVC_SERVICE_URL=http://avc-api:8000
+    depends_on:
+      avc-api:
+        condition: service_healthy
+    restart: unless-stopped

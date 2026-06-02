@@ -1,0 +1,23 @@
+# ML models and weights
+*.pkl
+*.pth
+*.h5
+**/uploads/
+
+# Python virtual envs and caches
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+env/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# IDE files and OS metadata
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
