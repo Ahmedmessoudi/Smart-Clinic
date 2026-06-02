@@ -328,31 +328,7 @@ def _get_badge_html(status: str) -> str:
 
 # Sidebar Design
 st.sidebar.markdown("<h2 style='text-align: center; margin-bottom: 0;'>🏥 Smart Clinic</h2>", unsafe_allow_html=True)
-st.sidebar.markdown("<p style='text-align: center; font-size: 0.85rem; color: #94a3b8; margin-top: 0;'>Multi-Service Diagnostic Suite</p>", unsafe_allow_html=True)
-st.sidebar.markdown("---")
-
-# Service Configuration
-st.sidebar.markdown("### ⚙️ Endpoint Config")
-api_url = st.sidebar.text_input("AVC ML URL", value=default_url)
-eye_api_url = st.sidebar.text_input("Eye ML URL", value=eye_default_url)
-skin_api_url = st.sidebar.text_input("Skin ML URL", value=skin_default_url)
-
-# Check Healths
-health_avc, _ = _check_health(api_url)
-health_eye, _ = _check_health(eye_api_url)
-health_skin, _ = _check_health(skin_api_url)
-
-# Display Badges
-st.sidebar.markdown(
-    f"""
-    <div style="font-size: 0.8rem; line-height: 1.8; margin-bottom: 10px;">
-        <div><b>AVC Service:</b> {_get_badge_html(health_avc)}</div>
-        <div style="margin-top: 5px;"><b>Eye Service:</b> {_get_badge_html(health_eye)}</div>
-        <div style="margin-top: 5px;"><b>Skin Service:</b> {_get_badge_html(health_skin)}</div>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
+st.sidebar.markdown("<p style='text-align: center; font-size: 0.85rem; color: #94a3b8; margin-top: 0;'>Diagnostic Agents Console</p>", unsafe_allow_html=True)
 st.sidebar.markdown("---")
 
 # Session State Initialization
@@ -363,8 +339,8 @@ if "messages" not in st.session_state:
             "content": (
                 "Welcome! I am your **Smart Clinic Diagnostic Assistant**. 🏥\n\n"
                 "I am fully integrated with your machine learning microservices. "
-                "Please configure and use the specialized diagnostic modules in the left sidebar "
-                "to analyze patient cases. You can also chat with me directly."
+                "Select an agent in the sidebar, fill out the diagnosis form on the main dashboard, "
+                "or write questions below to discuss clinical findings."
             ),
         }
     ]
@@ -372,7 +348,7 @@ if "messages" not in st.session_state:
 if "eye_model_type" not in st.session_state:
     st.session_state["eye_model_type"] = "retina"
 
-# Diagnostic Selector
+# Diagnostic Selector (The only thing in the sidebar besides logo)
 workflow = st.sidebar.selectbox(
     "Select Diagnostic Mode",
     [
@@ -380,135 +356,48 @@ workflow = st.sidebar.selectbox(
         "📷 CT Scan Analysis",
         "👁️ Eye Diseases",
         "🔬 Skin Diseases"
-    ],
-    help="Pick a diagnostic model to execute",
+    ]
 )
 
-# Render Forms based on selection
-if workflow == "📝 Infarctus du Myocarde":
-    st.sidebar.subheader("Patient Clinical Data")
-    
-    with st.sidebar.form(key="patient_form", clear_on_submit=False):
-        gender = st.selectbox("Gender", ["Male", "Female", "Other"])
-        age = st.number_input("Age (Years)", min_value=1.0, max_value=120.0, value=55.0, step=1.0)
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            hypertension = st.checkbox("Hypertension")
-            ever_married = st.checkbox("Ever Married", value=True)
-        with col2:
-            heart_disease = st.checkbox("Heart Disease")
-            
-        work_type = st.selectbox("Work Type", ["Private", "Self-employed", "Govt_job", "children", "Never_worked"])
-        residence_type = st.selectbox("Residence Type", ["Urban", "Rural"])
-        
-        avg_glucose_level = st.slider("Average Glucose (mg/dL)", min_value=30.0, max_value=500.0, value=95.0, step=0.5)
-        bmi = st.slider("Body Mass Index (BMI)", min_value=10.0, max_value=80.0, value=24.5, step=0.1)
-        
-        smoking_status = st.selectbox("Smoking Status", ["never smoked", "formerly smoked", "smokes"])
-        
-        submit_risk = st.form_submit_button("Calculate Stroke Risk")
+# API URLs (Defined internally, removed from UI)
+api_url = default_url
+eye_api_url = eye_default_url
+skin_api_url = skin_default_url
 
-    if submit_risk:
-        if health_avc != "healthy":
-            st.sidebar.error("Cannot process: AVC Service is offline. Check URL configuration.")
-        else:
-            patient_data = {
-                "gender": gender,
-                "age": age,
-                "hypertension": bool(hypertension),
-                "heart_disease": bool(heart_disease),
-                "ever_married": bool(ever_married),
-                "work_type": work_type,
-                "residence_type": residence_type,
-                "avg_glucose_level": float(avg_glucose_level),
-                "bmi": float(bmi),
-                "smoking_status": smoking_status
-            }
-            
-            user_msg = (
-                f"📝 **Requesting Stroke Risk Assessment for Patient:**\n"
-                f"- **Demographics**: {gender}, {int(age)} years old, ever married: {'Yes' if ever_married else 'No'}\n"
-                f"- **Clinical features**: Hypertension: {'Yes' if hypertension else 'No'}, Heart Disease: {'Yes' if heart_disease else 'No'}\n"
-                f"- **Vitals**: Glucose level: {avg_glucose_level:.1f} mg/dL, BMI: {bmi:.1f}\n"
-                f"- **Lifestyle**: Work: {work_type}, Residence: {residence_type}, Smoking: {smoking_status}"
-            )
-            st.session_state["messages"].append({"role": "user", "content": user_msg})
-            
-            with st.spinner("Calculating patient risk profile..."):
-                status_code, result = _predict_patient(api_url, patient_data)
-                
-            if status_code == 200:
-                risk_pct = result["risk_percentage"]
-                risk_lvl = result["risk_level"]
-                recs = result["recommendations"]
-                m_ver = result["model_version"]
-                feat_cnt = result["features_used"]
-                
-                colors = {
-                    "LOW": ("#0d9488", "#f0fdfa", "#115e59"),
-                    "MODERATE": ("#d97706", "#fef3c7", "#92400e"),
-                    "HIGH": ("#e11d48", "#fff1f2", "#9f1239"),
-                    "CRITICAL": ("#7f1d1d", "#fef2f2", "#7f1d1d")
-                }
-                border_c, bg_c, text_c = colors.get(risk_lvl, ("#0d9488", "#f0fdfa", "#115e59"))
-                
-                report_html = f"""
-                <div class="report-card" style="border-left: 6px solid {border_c}; background-color: {bg_c};">
-                    <div class="report-header" style="color: {text_c};">🧠 Patient Stroke Risk Report</div>
-                    <div class="report-grid">
-                        <div class="report-item">
-                            <span class="report-label">Risk Probability</span>
-                            <span class="report-value" style="color: {text_c};">{risk_pct}%</span>
-                        </div>
-                        <div class="report-item">
-                            <span class="report-label">Risk Level</span>
-                            <span class="report-value" style="color: {border_c}; font-weight: 800;">{risk_lvl}</span>
-                        </div>
-                    </div>
-                    <div style="margin-top: 10px;">
-                        <div class="recommendation-title">Clinical Recommendations</div>
-                        <div class="recommendation-body">{recs}</div>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: #94a3b8; border-top: 1px solid rgba(0,0,0,0.05); padding-top: 8px; margin-top: 15px;">
-                        <span>Inference Engine: {m_ver}</span>
-                        <span>Processed Variables: {feat_cnt}</span>
-                    </div>
-                </div>
-                """
-                st.session_state["messages"].append({
-                    "role": "assistant",
-                    "content": "I have successfully calculated the patient risk indicators using the Random Forest classifier model.",
-                    "html": report_html
-                })
-            else:
-                st.session_state["messages"].append({
-                    "role": "assistant",
-                    "content": f"⚠️ **Error**: Unable to complete patient risk prediction (API returned status {status_code}). Details: {result}"
-                })
-            st.rerun()
+# Clear other results when selecting a mode
+if workflow != "👁️ Eye Diseases":
+    st.session_state.pop("eye_result", None)
+if workflow != "🔬 Skin Diseases":
+    st.session_state.pop("skin_result", None)
 
-elif workflow == "📷 CT Scan Analysis":
+# Main Interface Header
+st.markdown("<h2 style='margin-bottom: 5px;'>🏥 Smart Clinic Clinical Assistant</h2>", unsafe_allow_html=True)
+st.markdown("<p style='color: #64748b; font-size: 1.1rem; margin-top:0; margin-bottom: 25px;'>Integrated machine learning decision-support console for cardiovascular risk, brain CT analysis, ophthalmology, and dermatology.</p>", unsafe_allow_html=True)
+
+# Render Sidebar/Main forms based on selection
+# EXCEPTION: CT Scan remains in the sidebar!
+if workflow == "📷 CT Scan Analysis":
+    st.sidebar.markdown("---")
     st.sidebar.subheader("Brain Scan Upload")
     uploaded_file = st.sidebar.file_uploader("Upload CT Scan Image", type=["png", "jpg", "jpeg"])
     submit_scan = st.sidebar.button("Run Diagnostic Classification", disabled=uploaded_file is None)
     
     if submit_scan and uploaded_file is not None:
-        if health_avc != "healthy":
-            st.sidebar.error("Cannot process: AVC Service is offline. Check URL configuration.")
-        else:
-            file_bytes = uploaded_file.getvalue()
-            file_name = uploaded_file.name
-            file_type = uploaded_file.type
-            
-            st.session_state["messages"].append({
-                "role": "user",
-                "content": f"📷 **Requested Brain CT Scan Diagnostics on file:** `{file_name}`",
-                "image": file_bytes
-            })
-            
-            with st.spinner("Analyzing brain parenchyma (excluding skull bone structure)..."):
+        file_bytes = uploaded_file.getvalue()
+        file_name = uploaded_file.name
+        file_type = uploaded_file.type
+        
+        st.session_state["messages"].append({
+            "role": "user",
+            "content": f"📷 **Requested Brain CT Scan Diagnostics on file:** `{file_name}`",
+            "image": file_bytes
+        })
+        
+        with st.spinner("Analyzing brain parenchyma (excluding skull bone structure)..."):
+            try:
                 status_code, result = _classify_ct_scan(api_url, file_name, file_bytes, file_type)
+            except Exception as e:
+                status_code, result = 500, {"error": f"AVC Service offline or unreachable: {e}"}
                 
             if status_code == 200:
                 cls_res = result["classification"]
@@ -562,330 +451,424 @@ elif workflow == "📷 CT Scan Analysis":
                 st.session_state["messages"].append({
                     "role": "assistant",
                     "content": "CT scan processing completed. The skull-exclusion algorithm has completed analysis of the brain parenchyma.",
-                    "html": report_html
+                    "html": report_html.replace('\n', ' ')
                 })
             else:
                 st.session_state["messages"].append({
                     "role": "assistant",
-                    "content": f"⚠️ **Error**: Unable to complete CT-scan analysis (API returned status {status_code}). Details: {result}"
+                    "content": f"⚠️ **Error**: Unable to complete CT-scan analysis (API returned status {status_code}). Details: {result.get('error', result) if isinstance(result, dict) else result}"
                 })
             st.rerun()
 
-elif workflow == "👁️ Eye Diseases":
-    st.sidebar.subheader("Ophthalmology Console")
-    
-    # Premium Dual Selector cards exactly matching the provided image description
-    retina_active = st.session_state.eye_model_type == "retina"
-    
-    # Visual cards matching eye image design
-    card_retina_html = f"""
-    <div style="
-        border: 2px solid {'#0d9488' if retina_active else '#1e293b'};
-        background-color: {'rgba(13, 148, 136, 0.05)' if retina_active else '#0f172a'};
-        border-radius: 12px;
-        padding: 12px;
-        text-align: center;
-        margin-bottom: 10px;
-    ">
-        <div style="font-size: 1.5rem;">🔬</div>
-        <div style="font-weight: 700; color: #ffffff; font-size: 0.95rem;">Fond d'œil (Rétine)</div>
-        <div style="font-size: 0.75rem; color: #94a3b8; margin: 4px 0;">Images rétiniennes · Keras</div>
-        <div style="margin-top: 4px;"><span style="background-color: #1e293b; border: 1px solid #334155; color: #0d9488; padding: 2px 8px; border-radius: 99px; font-size: 0.7rem; font-weight: 600;">8 classes · 300×300</span></div>
-    </div>
-    """
-    
-    card_external_html = f"""
-    <div style="
-        border: 2px solid {'#0d9488' if not retina_active else '#1e293b'};
-        background-color: {'rgba(13, 148, 136, 0.05)' if not retina_active else '#0f172a'};
-        border-radius: 12px;
-        padding: 12px;
-        text-align: center;
-        margin-bottom: 10px;
-    ">
-        <div style="font-size: 1.5rem;">👁️</div>
-        <div style="font-weight: 700; color: #ffffff; font-size: 0.95rem;">Œil externe</div>
-        <div style="font-size: 0.75rem; color: #94a3b8; margin: 4px 0;">Photos de l'œil · EfficientNet-B4</div>
-        <div style="margin-top: 4px;"><span style="background-color: #1e293b; border: 1px solid #334155; color: #0d9488; padding: 2px 8px; border-radius: 99px; font-size: 0.7rem; font-weight: 600;">5 classes · 380×380</span></div>
-    </div>
-    """
-    
-    col_retina, col_external = st.sidebar.columns(2)
-    with col_retina:
-        st.markdown(card_retina_html, unsafe_allow_html=True)
-        if st.button("Sélect. Rétine", use_container_width=True, key="sel_retina"):
-            st.session_state.eye_model_type = "retina"
-            st.rerun()
+# 📝 Infarctus du Myocarde Form is on the MAIN page
+if workflow == "📝 Infarctus du Myocarde":
+    with st.container(border=True):
+        st.subheader("Patient Clinical Data (Cardiovascular Risk)")
+        with st.form(key="patient_form", clear_on_submit=False):
+            gender = st.selectbox("Gender", ["Male", "Female", "Other"])
+            age = st.number_input("Age (Years)", min_value=1.0, max_value=120.0, value=55.0, step=1.0)
             
-    with col_external:
-        st.markdown(card_external_html, unsafe_allow_html=True)
-        if st.button("Sélect. Externe", use_container_width=True, key="sel_external"):
-            st.session_state.eye_model_type = "external"
-            st.rerun()
+            col1, col2 = st.columns(2)
+            with col1:
+                hypertension = st.checkbox("Hypertension")
+                ever_married = st.checkbox("Ever Married", value=True)
+            with col2:
+                heart_disease = st.checkbox("Heart Disease")
+                
+            work_type = st.selectbox("Work Type", ["Private", "Self-employed", "Govt_job", "children", "Never_worked"])
+            residence_type = st.selectbox("Residence Type", ["Urban", "Rural"])
+            
+            avg_glucose_level = st.slider("Average Glucose (mg/dL)", min_value=30.0, max_value=500.0, value=95.0, step=0.5)
+            bmi = st.slider("Body Mass Index (BMI)", min_value=10.0, max_value=80.0, value=24.5, step=0.1)
+            
+            smoking_status = st.selectbox("Smoking Status", ["never smoked", "formerly smoked", "smokes"])
+            
+            submit_risk = st.form_submit_button("Calculate Stroke Risk")
 
-    st.sidebar.markdown("---")
-    
-    # Model indicator banner
-    if st.session_state.eye_model_type == "retina":
-        st.sidebar.info("🔵 Modèle rétine — Kaggle Eye Diseases Classification (Keras .h5)")
-    else:
-        st.sidebar.info("🔵 Modèle externe — Mendeley Eye Diseases (EfficientNet-B4)")
+        if submit_risk:
+            patient_data = {
+                "gender": gender,
+                "age": age,
+                "hypertension": bool(hypertension),
+                "heart_disease": bool(heart_disease),
+                "ever_married": bool(ever_married),
+                "work_type": work_type,
+                "residence_type": residence_type,
+                "avg_glucose_level": float(avg_glucose_level),
+                "bmi": float(bmi),
+                "smoking_status": smoking_status
+            }
+            
+            user_msg = (
+                f"📝 **Requesting Stroke Risk Assessment for Patient:**\n"
+                f"- **Demographics**: {gender}, {int(age)} years old, ever married: {'Yes' if ever_married else 'No'}\n"
+                f"- **Clinical features**: Hypertension: {'Yes' if hypertension else 'No'}, Heart Disease: {'Yes' if heart_disease else 'No'}\n"
+                f"- **Vitals**: Glucose level: {avg_glucose_level:.1f} mg/dL, BMI: {bmi:.1f}\n"
+                f"- **Lifestyle**: Work: {work_type}, Residence: {residence_type}, Smoking: {smoking_status}"
+            )
+            st.session_state["messages"].append({"role": "user", "content": user_msg})
+            
+            with st.spinner("Calculating patient risk profile..."):
+                try:
+                    status_code, result = _predict_patient(api_url, patient_data)
+                except Exception as e:
+                    status_code, result = 500, {"error": f"AVC Service offline or unreachable: {e}"}
+                    
+                if status_code == 200:
+                    risk_pct = result["risk_percentage"]
+                    risk_lvl = result["risk_level"]
+                    recs = result["recommendations"]
+                    m_ver = result["model_version"]
+                    feat_cnt = result["features_used"]
+                    
+                    colors = {
+                        "LOW": ("#0d9488", "#f0fdfa", "#115e59"),
+                        "MODERATE": ("#d97706", "#fef3c7", "#92400e"),
+                        "HIGH": ("#e11d48", "#fff1f2", "#9f1239"),
+                        "CRITICAL": ("#7f1d1d", "#fef2f2", "#7f1d1d")
+                    }
+                    border_c, bg_c, text_c = colors.get(risk_lvl, ("#0d9488", "#f0fdfa", "#115e59"))
+                    
+                    report_html = f"""
+                    <div class="report-card" style="border-left: 6px solid {border_c}; background-color: {bg_c};">
+                        <div class="report-header" style="color: {text_c};">🧠 Patient Stroke Risk Report</div>
+                        <div class="report-grid">
+                            <div class="report-item">
+                                <span class="report-label">Risk Probability</span>
+                                <span class="report-value" style="color: {text_c};">{risk_pct}%</span>
+                            </div>
+                            <div class="report-item">
+                                <span class="report-label">Risk Level</span>
+                                <span class="report-value" style="color: {border_c}; font-weight: 800;">{risk_lvl}</span>
+                            </div>
+                        </div>
+                        <div style="margin-top: 10px;">
+                            <div class="recommendation-title">Clinical Recommendations</div>
+                            <div class="recommendation-body">{recs}</div>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: #94a3b8; border-top: 1px solid rgba(0,0,0,0.05); padding-top: 8px; margin-top: 15px;">
+                            <span>Inference Engine: {m_ver}</span>
+                            <span>Processed Variables: {feat_cnt}</span>
+                        </div>
+                    </div>
+                    """
+                    st.session_state["messages"].append({
+                        "role": "assistant",
+                        "content": "I have successfully calculated the patient risk indicators using the Random Forest classifier model.",
+                        "html": report_html.replace('\n', ' ')
+                    })
+                else:
+                    st.session_state["messages"].append({
+                        "role": "assistant",
+                        "content": f"⚠️ **Error**: Unable to complete patient risk prediction (API returned status {status_code}). Details: {result.get('error', result) if isinstance(result, dict) else result}"
+                    })
+                st.rerun()
+
+# 👁️ Eye Diseases form is on the MAIN page
+elif workflow == "👁️ Eye Diseases":
+    with st.container(border=True):
+        st.subheader("Ophthalmology Scan Analysis (Retina / External)")
         
-    uploaded_eye_file = st.sidebar.file_uploader(
-        "Déposez une image oculaire", 
-        type=["png", "jpg", "jpeg", "bmp", "tiff"]
-    )
-    st.sidebar.caption("JPEG • PNG • BMP • TIFF — max 10 Mo")
-    
-    submit_eye = st.sidebar.button("Analyser l'image", disabled=uploaded_eye_file is None)
-    
-    if submit_eye and uploaded_eye_file is not None:
-        if health_eye != "healthy":
-            st.sidebar.error("Cannot process: Eye ML Service is offline. Check URL configuration.")
+        # Selector cards matching the design in the provided image description
+        retina_active = st.session_state.eye_model_type == "retina"
+        
+        card_retina_html = f"""
+        <div style="
+            border: 2px solid {'#0d9488' if retina_active else '#e2e8f0'};
+            background-color: {'rgba(13, 148, 136, 0.05)' if retina_active else '#ffffff'};
+            border-radius: 12px;
+            padding: 15px;
+            text-align: center;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        ">
+            <div style="font-size: 1.8rem; margin-bottom: 5px;">🔬</div>
+            <div style="font-weight: 700; color: #1e293b; font-size: 1.05rem;">Fond d'œil (Rétine)</div>
+            <div style="font-size: 0.8rem; color: #64748b; margin: 4px 0;">Images rétiniennes · Keras</div>
+            <div style="margin-top: 6px;"><span style="background-color: #f1f5f9; border: 1px solid #cbd5e1; color: #0d9488; padding: 3px 10px; border-radius: 99px; font-size: 0.75rem; font-weight: 600;">8 classes · 300×300</span></div>
+        </div>
+        """
+        
+        card_external_html = f"""
+        <div style="
+            border: 2px solid {'#0d9488' if not retina_active else '#e2e8f0'};
+            background-color: {'rgba(13, 148, 136, 0.05)' if not retina_active else '#ffffff'};
+            border-radius: 12px;
+            padding: 15px;
+            text-align: center;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        ">
+            <div style="font-size: 1.8rem; margin-bottom: 5px;">👁️</div>
+            <div style="font-weight: 700; color: #1e293b; font-size: 1.05rem;">Œil externe</div>
+            <div style="font-size: 0.8rem; color: #64748b; margin: 4px 0;">Photos de l'œil · EfficientNet-B4</div>
+            <div style="margin-top: 6px;"><span style="background-color: #f1f5f9; border: 1px solid #cbd5e1; color: #0d9488; padding: 3px 10px; border-radius: 99px; font-size: 0.75rem; font-weight: 600;">5 classes · 380×380</span></div>
+        </div>
+        """
+        
+        col_ret, col_ext = st.columns(2)
+        with col_ret:
+            st.markdown(card_retina_html, unsafe_allow_html=True)
+            if st.button("Sélect. Rétine", use_container_width=True, key="sel_retina_main"):
+                st.session_state.eye_model_type = "retina"
+                st.session_state.pop("eye_result", None)
+                st.rerun()
+                
+        with col_ext:
+            st.markdown(card_external_html, unsafe_allow_html=True)
+            if st.button("Sélect. Externe", use_container_width=True, key="sel_external_main"):
+                st.session_state.eye_model_type = "external"
+                st.session_state.pop("eye_result", None)
+                st.rerun()
+
+        st.markdown("---")
+        
+        # Model banner
+        if st.session_state.eye_model_type == "retina":
+            st.info("🔵 Modèle rétine — Kaggle Eye Diseases Classification (Keras .h5)")
         else:
+            st.info("🔵 Modèle externe — Mendeley Eye Diseases (EfficientNet-B4)")
+            
+        uploaded_eye_file = st.file_uploader(
+            "Déposez une image oculaire", 
+            type=["png", "jpg", "jpeg", "bmp", "tiff"],
+            key="eye_file_uploader"
+        )
+        st.caption("JPEG • PNG • BMP • TIFF — max 10 Mo")
+        
+        submit_eye = st.button("Analyser l'image", disabled=uploaded_eye_file is None, key="submit_eye_main")
+        
+        if submit_eye and uploaded_eye_file is not None:
             file_bytes = uploaded_eye_file.getvalue()
             file_name = uploaded_eye_file.name
             file_type = uploaded_eye_file.type
             m_type = st.session_state.eye_model_type
             
-            st.session_state["messages"].append({
-                "role": "user",
-                "content": f"👁️ **Requested Eye Diagnostics ({'Retina Scan' if m_type == 'retina' else 'External Photo'}):** `{file_name}`",
-                "image": file_bytes
-            })
-            
             with st.spinner("Processing eye scan image..."):
-                status_code, result = _classify_eye_disease(eye_api_url, m_type, file_name, file_bytes, file_type)
-                
-            if status_code == 200:
-                pred_class = result["prediction"]
-                confidence = result["confidence"]
-                top3 = result.get("top3", [])
-                
-                # Check normal vs pathology styling
-                is_normal = "normal" in pred_class.lower()
-                border_c = "#0d9488" if is_normal else "#e11d48"
-                bg_c = "#f0fdfa" if is_normal else "#fff1f2"
-                txt_c = "#115e59" if is_normal else "#9f1239"
-                
-                # Render other pathology names and progress bars
-                top3_html = ""
-                for rank, p in enumerate(top3):
-                    p_name = p["class"]
-                    p_conf = p["confidence"]
-                    p_color = "#0d9488" if "normal" in p_name.lower() else "#e11d48"
-                    top3_html += f"""
-                    <div style="margin-bottom: 8px;">
-                        <div style="display: flex; justify-content: space-between; font-size: 0.85rem; font-weight: 600; margin-bottom: 2px;">
-                            <span style="color: #334155;">{rank+1}. {p_name}</span>
-                            <span style="color: {p_color};">{p_conf}%</span>
+                try:
+                    status_code, result = _classify_eye_disease(eye_api_url, m_type, file_name, file_bytes, file_type)
+                except Exception as e:
+                    status_code, result = 500, {"error": f"Eye Service offline or unreachable: {e}"}
+                    
+                if status_code == 200:
+                    pred_class = result["prediction"]
+                    confidence = result["confidence"]
+                    top3 = result.get("top3", [])
+                    
+                    is_normal = "normal" in pred_class.lower()
+                    border_c = "#0d9488" if is_normal else "#e11d48"
+                    bg_c = "#f0fdfa" if is_normal else "#fff1f2"
+                    txt_c = "#115e59" if is_normal else "#9f1239"
+                    
+                    top3_html = ""
+                    for rank, p in enumerate(top3):
+                        p_name = p["class"]
+                        p_conf = p["confidence"]
+                        p_color = "#0d9488" if "normal" in p_name.lower() else "#e11d48"
+                        top3_html += f"""
+                        <div style="margin-bottom: 8px;">
+                            <div style="display: flex; justify-content: space-between; font-size: 0.85rem; font-weight: 600; margin-bottom: 2px;">
+                                <span style="color: #334155;">{rank+1}. {p_name}</span>
+                                <span style="color: {p_color};">{p_conf}%</span>
+                            </div>
+                            <div style="background-color: #cbd5e1; border-radius: 4px; overflow: hidden; height: 6px; width: 100%;">
+                                <div style="background-color: {p_color}; width: {p_conf}%; height: 100%;"></div>
+                            </div>
                         </div>
-                        <div style="background-color: #cbd5e1; border-radius: 4px; overflow: hidden; height: 6px; width: 100%;">
-                            <div style="background-color: {p_color}; width: {p_conf}%; height: 100%;"></div>
+                        """
+                    
+                    report_html = f"""
+                    <div class="report-card" style="border-left: 6px solid {border_c}; background-color: {bg_c};">
+                        <div class="report-header" style="color: {txt_c};">👁️ Eye Diagnostic Report ({m_type.upper()})</div>
+                        <div class="report-grid">
+                            <div class="report-item">
+                                <span class="report-label">Top Condition</span>
+                                <span class="report-value" style="color: {txt_c};">{pred_class}</span>
+                            </div>
+                            <div class="report-item">
+                                <span class="report-label">Confidence Score</span>
+                                <span class="report-value" style="color: {border_c}; font-weight: 800;">{confidence}%</span>
+                            </div>
+                        </div>
+                        
+                        <div style="margin-top: 15px; margin-bottom: 15px;">
+                            <div class="recommendation-title">Top 3 Class Probabilities</div>
+                            <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-top: 5px;">
+                                {top3_html}
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <div class="recommendation-title">Clinical Action Notes</div>
+                            <div class="recommendation-body">
+                                {"Maintain regular diagnostic screenings." if is_normal else "Ophthalmologist evaluation is highly advised. Plan retinal mapping or slit lamp verification."}
+                            </div>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: #94a3b8; border-top: 1px solid rgba(0,0,0,0.05); padding-top: 8px; margin-top: 15px;">
+                            <span>Inference Pipeline: Keras h5 (Retina) or PyTorch pth (External)</span>
+                            <span>Filename: {result.get('filename', 'Unknown')}</span>
                         </div>
                     </div>
                     """
-                
-                report_html = f"""
-                <div class="report-card" style="border-left: 6px solid {border_c}; background-color: {bg_c};">
-                    <div class="report-header" style="color: {txt_c};">👁️ Eye Diagnostic Report ({m_type.upper()})</div>
-                    <div class="report-grid">
-                        <div class="report-item">
-                            <span class="report-label">Top Condition</span>
-                            <span class="report-value" style="color: {txt_c};">{pred_class}</span>
-                        </div>
-                        <div class="report-item">
-                            <span class="report-label">Confidence Score</span>
-                            <span class="report-value" style="color: {border_c}; font-weight: 800;">{confidence}%</span>
-                        </div>
-                    </div>
-                    
-                    <div style="margin-top: 15px; margin-bottom: 15px;">
-                        <div class="recommendation-title">Top 3 Class Probabilities</div>
-                        <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-top: 5px;">
-                            {top3_html}
-                        </div>
-                    </div>
-                    
-                    <div>
-                        <div class="recommendation-title">Clinical Action Notes</div>
-                        <div class="recommendation-body">
-                            {"Maintain regular diagnostic screenings." if is_normal else "Ophthalmologist evaluation is highly advised. Plan retinal mapping or slit lamp verification."}
-                        </div>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: #94a3b8; border-top: 1px solid rgba(0,0,0,0.05); padding-top: 8px; margin-top: 15px;">
-                        <span>Inference Pipeline: Keras h5 (Retina) or PyTorch pth (External)</span>
-                        <span>Filename: {result.get('filename', 'Unknown')}</span>
-                    </div>
-                </div>
-                """
-                st.session_state["messages"].append({
-                    "role": "assistant",
-                    "content": "Image processed successfully. Reconstructed eye classification results details are posted.",
-                    "html": report_html
-                })
-            else:
-                st.session_state["messages"].append({
-                    "role": "assistant",
-                    "content": f"⚠️ **Error**: Unable to complete eye analysis (API returned status {status_code}). Details: {result}"
-                })
-            st.rerun()
+                    st.session_state["eye_result"] = report_html.replace('\n', ' ')
+                else:
+                    st.error(f"⚠️ **Error**: Unable to complete eye analysis (API returned status {status_code}). Details: {result.get('error', result) if isinstance(result, dict) else result}")
+                st.rerun()
 
+        # Display eye results on screen
+        if st.session_state.get("eye_result"):
+            st.markdown(st.session_state["eye_result"], unsafe_allow_html=True)
+
+# 🔬 Skin Diseases form is on the MAIN page
 elif workflow == "🔬 Skin Diseases":
-    st.sidebar.subheader("Dermatology Console")
-    
-    uploaded_skin_file = st.sidebar.file_uploader(
-        "Upload Skin Photo", 
-        type=["png", "jpg", "jpeg", "webp", "bmp"]
-    )
-    st.sidebar.caption("JPEG • PNG • WEBP • BMP — max 10 Mo")
-    
-    use_tta = st.sidebar.checkbox(
-        "Enable Test-Time Augmentation (TTA)", 
-        value=False,
-        help="Runs 8 randomized transforms for high accuracy (+8x inference time)"
-    )
-    topk_slider = st.sidebar.slider("Show Top-K Classes", min_value=1, max_value=5, value=3)
-    
-    submit_skin = st.sidebar.button("Analyze Skin Image", disabled=uploaded_skin_file is None)
-    
-    if submit_skin and uploaded_skin_file is not None:
-        if health_skin != "healthy":
-            st.sidebar.error("Cannot process: Skin Service is offline. Check URL configuration.")
-        else:
+    with st.container(border=True):
+        st.subheader("Dermatology Photo Analysis (Skin Classifier)")
+        uploaded_skin_file = st.file_uploader(
+            "Upload Skin Photo", 
+            type=["png", "jpg", "jpeg", "webp", "bmp"],
+            key="skin_file_uploader"
+        )
+        st.caption("JPEG • PNG • WEBP • BMP — max 10 Mo")
+        
+        col_tta, col_k = st.columns(2)
+        with col_tta:
+            use_tta = st.checkbox(
+                "Enable Test-Time Augmentation (TTA)", 
+                value=False,
+                help="Runs 8 randomized transforms for high accuracy (+8x inference time)"
+            )
+        with col_k:
+            topk_slider = st.slider("Show Top-K Classes", min_value=1, max_value=5, value=3)
+            
+        submit_skin = st.button("Analyze Skin Image", disabled=uploaded_skin_file is None, key="submit_skin_main")
+        
+        if submit_skin and uploaded_skin_file is not None:
             file_bytes = uploaded_skin_file.getvalue()
             file_name = uploaded_skin_file.name
             file_type = uploaded_skin_file.type
             
-            st.session_state["messages"].append({
-                "role": "user",
-                "content": f"🔬 **Requested Skin Lesion Analysis:** `{file_name}` (TTA: {'Enabled' if use_tta else 'Disabled'}, Top-{topk_slider})",
-                "image": file_bytes
-            })
-            
             with st.spinner("Analyzing skin condition via EfficientNetV2-S..."):
-                status_code, result = _classify_skin_disease(
-                    skin_api_url, file_name, file_bytes, file_type, use_tta, topk_slider
-                )
-                
-            if status_code == 200:
-                top_pred = result["top_prediction"]
-                confidence = result["confidence"]
-                percent = result["percent"]
-                all_preds = result.get("all_predictions", [])
-                
-                # Check for severe classes
-                is_severe = any(w in top_pred.lower() for w in ["melanoma", "cancer", "basal", "malignant", "lupus"])
-                border_c = "#e11d48" if is_severe else "#d97706"
-                bg_c = "#fff1f2" if is_severe else "#fef3c7"
-                txt_c = "#9f1239" if is_severe else "#92400e"
-                
-                # Render predictions table with progress bars
-                all_preds_html = ""
-                for pred in all_preds:
-                    p_name = pred["class"]
-                    p_pct = pred["percent"]
-                    is_pred_severe = any(w in p_name.lower() for w in ["melanoma", "cancer", "basal", "malignant", "lupus"])
-                    p_color = "#e11d48" if is_pred_severe else "#0d9488"
+                try:
+                    status_code, result = _classify_skin_disease(
+                        skin_api_url, file_name, file_bytes, file_type, use_tta, topk_slider
+                    )
+                except Exception as e:
+                    status_code, result = 500, {"error": f"Skin Service offline or unreachable: {e}"}
                     
-                    all_preds_html += f"""
-                    <div style="margin-bottom: 8px;">
-                        <div style="display: flex; justify-content: space-between; font-size: 0.85rem; font-weight: 600; margin-bottom: 2px;">
-                            <span style="color: #334155;">{pred['rank']}. {p_name}</span>
-                            <span style="color: {p_color};">{p_pct}%</span>
+                if status_code == 200:
+                    top_pred = result["top_prediction"]
+                    confidence = result["confidence"]
+                    percent = result["percent"]
+                    all_preds = result.get("all_predictions", [])
+                    
+                    is_severe = any(w in top_pred.lower() for w in ["melanoma", "cancer", "basal", "malignant", "lupus"])
+                    border_c = "#e11d48" if is_severe else "#d97706"
+                    bg_c = "#fff1f2" if is_severe else "#fef3c7"
+                    txt_c = "#9f1239" if is_severe else "#92400e"
+                    
+                    all_preds_html = ""
+                    for pred in all_preds:
+                        p_name = pred["class"]
+                        p_pct = pred["percent"]
+                        is_pred_severe = any(w in p_name.lower() for w in ["melanoma", "cancer", "basal", "malignant", "lupus"])
+                        p_color = "#e11d48" if is_pred_severe else "#0d9488"
+                        
+                        all_preds_html += f"""
+                        <div style="margin-bottom: 8px;">
+                            <div style="display: flex; justify-content: space-between; font-size: 0.85rem; font-weight: 600; margin-bottom: 2px;">
+                                <span style="color: #334155;">{pred['rank']}. {p_name}</span>
+                                <span style="color: {p_color};">{p_pct}%</span>
+                            </div>
+                            <div style="background-color: #cbd5e1; border-radius: 4px; overflow: hidden; height: 6px; width: 100%;">
+                                <div style="background-color: {p_color}; width: {p_pct}%; height: 100%;"></div>
+                            </div>
                         </div>
-                        <div style="background-color: #cbd5e1; border-radius: 4px; overflow: hidden; height: 6px; width: 100%;">
-                            <div style="background-color: {p_color}; width: {p_pct}%; height: 100%;"></div>
+                        """
+                    
+                    report_html = f"""
+                    <div class="report-card" style="border-left: 6px solid {border_c}; background-color: {bg_c};">
+                        <div class="report-header" style="color: {txt_c};">🔬 Skin Disease Classification Report</div>
+                        <div class="report-grid">
+                            <div class="report-item">
+                                <span class="report-label">Top Diagnosis</span>
+                                <span class="report-value" style="color: {txt_c};">{top_pred}</span>
+                            </div>
+                            <div class="report-item">
+                                <span class="report-label">Match Percentage</span>
+                                <span class="report-value" style="color: {border_c}; font-weight: 800;">{percent}%</span>
+                            </div>
+                        </div>
+                        
+                        <div style="margin-top: 15px; margin-bottom: 15px;">
+                            <div class="recommendation-title">Top Candidates List</div>
+                            <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-top: 5px;">
+                                {all_preds_html}
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <div class="recommendation-title">Dermatology Assessment Warning</div>
+                            <div class="recommendation-body">
+                                {"⚠️ CRITICAL WARNING: Highly suspicious malignant lesion parameters. Urgent biopsy requested." if is_severe 
+                                 else "Monitor evolution. Consult a doctor if it changes shape, size, color, or begins bleeding."}
+                            </div>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: #94a3b8; border-top: 1px solid rgba(0,0,0,0.05); padding-top: 8px; margin-top: 15px;">
+                            <span>Inference Engine: EfficientNetV2-S (DermNet)</span>
+                            <span>Augmentation: {"TTA Enabled" if result.get("model_info", {}).get("tta") else "TTA Disabled"}</span>
                         </div>
                     </div>
                     """
-                
-                report_html = f"""
-                <div class="report-card" style="border-left: 6px solid {border_c}; background-color: {bg_c};">
-                    <div class="report-header" style="color: {txt_c};">🔬 Skin Disease Classification Report</div>
-                    <div class="report-grid">
-                        <div class="report-item">
-                            <span class="report-label">Top Diagnosis</span>
-                            <span class="report-value" style="color: {txt_c};">{top_pred}</span>
-                        </div>
-                        <div class="report-item">
-                            <span class="report-label">Match Percentage</span>
-                            <span class="report-value" style="color: {border_c}; font-weight: 800;">{percent}%</span>
-                        </div>
-                    </div>
-                    
-                    <div style="margin-top: 15px; margin-bottom: 15px;">
-                        <div class="recommendation-title">Top Candidates List</div>
-                        <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-top: 5px;">
-                            {all_preds_html}
-                        </div>
-                    </div>
-                    
-                    <div>
-                        <div class="recommendation-title">Dermatology Assessment Warning</div>
-                        <div class="recommendation-body">
-                            {"⚠️ CRITICAL WARNING: Highly suspicious malignant lesion parameters. Urgent biopsy requested." if is_severe 
-                             else "Monitor evolution. Consult a doctor if it changes shape, size, color, or begins bleeding."}
-                        </div>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: #94a3b8; border-top: 1px solid rgba(0,0,0,0.05); padding-top: 8px; margin-top: 15px;">
-                        <span>Inference Engine: EfficientNetV2-S (DermNet)</span>
-                        <span>Augmentation: {"TTA Enabled" if result.get("model_info", {}).get("tta") else "TTA Disabled"}</span>
-                    </div>
-                </div>
-                """
-                st.session_state["messages"].append({
+                    st.session_state["skin_result"] = report_html.replace('\n', ' ')
+                else:
+                    st.error(f"⚠️ **Error**: Unable to complete skin analysis (API returned status {status_code}). Details: {result.get('error', result) if isinstance(result, dict) else result}")
+                st.rerun()
+
+        # Display skin results on screen
+        if st.session_state.get("skin_result"):
+            st.markdown(st.session_state["skin_result"], unsafe_allow_html=True)
+
+# Render Chat Discussion - ONLY for Infarctus du Myocarde and CT Scan Analysis
+if workflow in ["📝 Infarctus du Myocarde", "📷 CT Scan Analysis"]:
+    st.markdown("---")
+    col_spacer, col_clear = st.columns([5, 1])
+    with col_clear:
+        if st.button("🧹 Clear Chat", use_container_width=True, key="clear_chat_main"):
+            st.session_state["messages"] = [
+                {
                     "role": "assistant",
-                    "content": "Dermatology analysis completed. Reconstructed skin condition report has been logged.",
-                    "html": report_html
-                })
-            else:
-                st.session_state["messages"].append({
-                    "role": "assistant",
-                    "content": f"⚠️ **Error**: Unable to complete skin analysis (API returned status {status_code}). Details: {result}"
-                })
+                    "content": (
+                        "History cleared. I am your **Smart Clinic Diagnostic Assistant**. 🏥\n\n"
+                        "Please fill in the form parameters or upload your scans above to run evaluations, "
+                        "or write questions below regarding clinical symptoms."
+                    )
+                }
+            ]
             st.rerun()
 
-# Clear Chat Option
-st.sidebar.markdown("---")
-if st.sidebar.button("Clear Conversation History", use_container_width=True):
-    st.session_state["messages"] = [
-        {
-            "role": "assistant",
-            "content": (
-                "History cleared. I am your **Smart Clinic Diagnostic Assistant**. 🏥\n\n"
-                "Please use the forms on the sidebar to calculate risk parameters or upload scans, "
-                "or write questions below regarding clinical symptoms."
-            )
-        }
-    ]
-
-# Render Chat Discussion
-chat_container = st.container()
-with chat_container:
-    for message in st.session_state["messages"]:
-        with st.chat_message(message["role"], avatar="🏥" if message["role"] == "assistant" else "👤"):
-            if message.get("content"):
-                st.markdown(message["content"])
-            
-            if message.get("image"):
-                img_data = Image.open(io.BytesIO(message["image"]))
-                st.image(img_data, caption="Uploaded File Scan", width=300)
+    chat_container = st.container()
+    with chat_container:
+        for message in st.session_state["messages"]:
+            with st.chat_message(message["role"], avatar="🏥" if message["role"] == "assistant" else "👤"):
+                if message.get("content"):
+                    st.markdown(message["content"])
                 
-            if message.get("html"):
-                st.markdown(message["html"], unsafe_allow_html=True)
+                if message.get("image"):
+                    img_data = Image.open(io.BytesIO(message["image"]))
+                    st.image(img_data, caption="Uploaded File Scan", width=300)
+                    
+                if message.get("html"):
+                    st.markdown(message["html"], unsafe_allow_html=True)
 
-# Chat Input field
-user_prompt = st.chat_input("Type a message to discuss diagnostics with the Smart Clinic Agent...")
+    # Chat Input field
+    user_prompt = st.chat_input("Type a message to discuss diagnostics with the Smart Clinic Agent...")
 
-if user_prompt:
-    st.session_state["messages"].append({"role": "user", "content": user_prompt})
-    
-    with st.spinner("Smart Clinic Agent is thinking..."):
-        agent_reply = _get_conversational_response(user_prompt)
+    if user_prompt:
+        st.session_state["messages"].append({"role": "user", "content": user_prompt})
         
-    st.session_state["messages"].append({"role": "assistant", "content": agent_reply})
-    st.rerun()
+        with st.spinner("Smart Clinic Agent is thinking..."):
+            agent_reply = _get_conversational_response(user_prompt)
+            
+        st.session_state["messages"].append({"role": "assistant", "content": agent_reply})
+        st.rerun()
 
 # Footer Warning
 st.markdown("---")
@@ -896,4 +879,5 @@ st.markdown(
     "</p>",
     unsafe_allow_html=True,
 )
+
 
