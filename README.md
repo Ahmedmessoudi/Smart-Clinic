@@ -1,4 +1,4 @@
-# 🧠 AVC Stroke Clinical Assistant & ML Microservice
+# 🧠 Clinical Assistant & ML Microservice
 
 This project is a multi-container machine learning application designed to assist in cerebral stroke diagnosis. It features a high-fidelity conversational Streamlit frontend (the **AVC Agent**) and a robust FastAPI backend microservice.
 
